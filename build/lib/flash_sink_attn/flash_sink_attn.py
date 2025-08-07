@@ -21,7 +21,7 @@ def _bwd_preprocess_do_o_dot(
     nheads,
     seqlen_q,
     seqlen_q_rounded,
-    EVEN_M: tl.constexpr,
+    headdim,
     BLOCK_M: tl.constexpr,
     BLOCK_HEADDIM: tl.constexpr,
 ):
@@ -33,34 +33,21 @@ def _bwd_preprocess_do_o_dot(
     offs_m = start_m * BLOCK_M + tl.arange(0, BLOCK_M)
     offs_d = tl.arange(0, BLOCK_HEADDIM)
 
-    if EVEN_M:
-        o = tl.load(
-            Out + off_b * stride_ob + off_h * stride_oh + offs_m[:, None] * stride_om + offs_d[None, :],
-        ).to(tl.float32)
-        do = tl.load(
-            DO
-            + off_b * stride_dob
-            + off_h * stride_doh
-            + offs_m[:, None] * stride_dom
-            + offs_d[None, :],
-        ).to(tl.float32)
+    o = tl.load(
+        Out + off_b * stride_ob + off_h * stride_oh + offs_m[:, None] * stride_om + offs_d[None, :],
+        mask=(offs_m[:, None] < seqlen_q) & (offs_d[None, :] < headdim),
+        other=0.0,
+    ).to(tl.float32)
 
-    else:
-        o = tl.load(
-            Out + off_b * stride_ob + off_h * stride_oh + offs_m[:, None] * stride_om + offs_d[None, :],
-            mask=(offs_m[:, None] < seqlen_q),
-            other=0.0,
-        ).to(tl.float32)
-        do = tl.load(
-            DO
-            + off_b * stride_dob
-            + off_h * stride_doh
-            + offs_m[:, None] * stride_dom
-            + offs_d[None, :],
-            mask=(offs_m[:, None] < seqlen_q),
-            other=0.0,
-        ).to(tl.float32)
-
+    do = tl.load(
+        DO
+        + off_b * stride_dob
+        + off_h * stride_doh
+        + offs_m[:, None] * stride_dom
+        + offs_d[None, :],
+        mask=(offs_m[:, None] < seqlen_q) & (offs_d[None, :] < headdim),
+        other=0.0,
+    ).to(tl.float32)
     delta = tl.sum(o * do, axis=1)
 
     tl.store(Delta + off_hb * seqlen_q_rounded + offs_m, delta)
@@ -111,7 +98,7 @@ def _fwd_kernel(
 
     q_idx = q_start_idx + offs_m
 
-    for kv_block_idx in tl.range(0, start_m_block + 1):
+    for kv_block_idx in tl.range(0, start_m_block):
 
         if ~((kv_block_idx * BLOCK_N >= sink) & (kv_block_idx * BLOCK_N + BLOCK_N <= start_m_block * BLOCK_M - sliding)):
 
@@ -140,8 +127,6 @@ def _fwd_kernel(
             l_i_new = tl.exp(lse_i - m_ij) + l_ij
             lse_i = m_ij + tl.log(l_i_new)
 
-        # k_ptrs.advance((BLOCK_N, 0))
-        # v_ptrs.advance((BLOCK_N, 0))
         k_ptrs += BLOCK_N * stride_kvn
         v_ptrs += BLOCK_N * stride_kvn
 
@@ -214,7 +199,7 @@ def _bwd_kernel(
 
     q_idx = q_start_idx + offs_m
 
-    for kv_block_idx in range(0, start_m_block + 1):
+    for kv_block_idx in range(0, start_m_block):
 
         if ~((kv_block_idx * BLOCK_N >= sink) & (kv_block_idx * BLOCK_N + BLOCK_N <= start_m_block * BLOCK_M - sliding)):
 
@@ -243,10 +228,10 @@ def _bwd_kernel(
 
             dq_block += tl.dot(ds, k)
 
-        k_ptrs += BLOCK_N * stride_kvn
-        v_ptrs += BLOCK_N * stride_kvn
-        dk_ptrs += BLOCK_N * stride_dkvn
-        dv_ptrs += BLOCK_N * stride_dkvn
+        tl.advance(k_ptrs, (BLOCK_N, 0))
+        tl.advance(v_ptrs, (BLOCK_N, 0))
+        tl.advance(dk_ptrs, (BLOCK_N, 0))
+        tl.advance(dv_ptrs, (BLOCK_N, 0))
 
     if EVEN_M:
         tl.store(dq_ptrs, dq_block)
@@ -340,8 +325,7 @@ def _flash_attn_backward(
         o, do, delta,
         o.stride(0), o.stride(2), o.stride(1),
         do.stride(0), do.stride(2), do.stride(1),
-        nheads, seqlen_q, seqlen_q_rounded,
-        EVEN_M=(seqlen_q % BLOCK_M == 0),
+        nheads, seqlen_q, seqlen_q_rounded, d,
         BLOCK_M=BLOCK_M, BLOCK_HEADDIM=BLOCK_HEADDIM
     )
     

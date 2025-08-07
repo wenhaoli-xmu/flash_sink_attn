@@ -1,10 +1,9 @@
 
 import torch
 from flash_sink_attn import SinkCacheManager
-from flash_sink_attn import flash_sink_attn_func
+from flash_sink_attn import flash_sink_attn_func, flash_attn_with_sink_func
 from flash_attn import flash_attn_func
 
-from torch.nn import MultiheadAttention
 
 num_tokens = [1024 * 2 ** i for i in range(6)]
 batch_size = 1
@@ -77,11 +76,22 @@ def eager_attn(query, key, value, mask):
     return attn_matrix @ value
 
 def flash_attn_with_sink(query, key, value, mask):
-    
-
-
-
+    sink = torch.randn(
+        (num_query_heads,),
+        dtype=dtype,
+        device="cuda",
+        requires_grad=True,)
+    output = flash_attn_with_sink_func(
+        query,
+        key,
+        value,
+        sink,
+        window_size=(sliding, 0),
+        softmax_scale=1 / 128 ** 0.5,
+        causal=True)
+    output.sum().backward()
 
 test(flash_attn, "flash_attn")
 test(flash_sink_attn, "flash_sink_attn")
-test(eager_attn, "eager_attn")
+test(flash_attn_with_sink, "flash_attn_with_sink")
+# test(eager_attn, "eager_attn")
