@@ -7,7 +7,6 @@ import triton.language as tl
 BLOCK_M = 64
 BLOCK_N = 64
 
-
 @triton.jit
 def _bwd_preprocess_do_o_dot(
     Out,
@@ -99,7 +98,7 @@ def _fwd_kernel(
 
     q_idx = q_start_idx + offs_m
 
-    for kv_block_idx in tl.range(0, tl.cdiv(seqlen_k, BLOCK_N)):
+    for kv_block_idx in tl.range(0, start_m_block):
 
         if ~((kv_block_idx * BLOCK_N >= sink) & (kv_block_idx * BLOCK_N + BLOCK_N <= start_m_block * BLOCK_M - sliding)):
 
@@ -200,7 +199,7 @@ def _bwd_kernel(
 
     q_idx = q_start_idx + offs_m
 
-    for kv_block_idx in range(0, tl.cdiv(seqlen_k, BLOCK_N)):
+    for kv_block_idx in range(0, start_m_block):
 
         if ~((kv_block_idx * BLOCK_N >= sink) & (kv_block_idx * BLOCK_N + BLOCK_N <= start_m_block * BLOCK_M - sliding)):
 
@@ -229,10 +228,10 @@ def _bwd_kernel(
 
             dq_block += tl.dot(ds, k)
 
-        k_ptrs += BLOCK_N * stride_kvn
-        v_ptrs += BLOCK_N * stride_kvn
-        dk_ptrs += BLOCK_N * stride_dkvn
-        dv_ptrs += BLOCK_N * stride_dkvn
+        tl.advance(k_ptrs, (BLOCK_N, 0))
+        tl.advance(v_ptrs, (BLOCK_N, 0))
+        tl.advance(dk_ptrs, (BLOCK_N, 0))
+        tl.advance(dv_ptrs, (BLOCK_N, 0))
 
     if EVEN_M:
         tl.store(dq_ptrs, dq_block)
