@@ -41,8 +41,8 @@ def _forward_gpt_oss(
 
     if past_key_value is not None:
         raise NotImplementedError(f"Inference mode is not implemented, please switch to eager attention.")
-        cache_kwargs = {"cache_position": cache_position}
-        key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
+        # cache_kwargs = {"cache_position": cache_position}
+        # key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
 
     # ================================================
     # NOTE: 最关键的代码
