@@ -24,6 +24,19 @@ BLOCK_N = 64
 可以尝试将他们增大到128
 ```
 
+# 评估速度
+```
+python benchmark.py
+
+脚本中的如下参数可以修改：
+num_tokens = 32123
+num_kv_heads = 4
+num_query_heads = 28
+sink = 64
+sliding = 2048
+dtype = torch.float16
+```
+
 # 使用方法
 ```python
 from .flash_sink_attn import flash_sink_attn_func
