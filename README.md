@@ -5,11 +5,23 @@ cd flash_sink_attn
 pip install .
 ```
 
+Tips: 最好安装最新的triton 3.4.0版本（如果能安装的上）
+
 ```
 # [可选]安装profiler（运行benchmark.py需要）
 git clone https://github.com/wenhaoli-xmu/lm-profiler.git
 cd profiler
 pip install -e .
+```
+
+# 调参数
+```
+对于H20/H100，可以打开 flash_sink_attn/flash_sink_attn.py，里面有两个global变量：
+
+BLOCK_M = 64
+BLOCK_N = 64
+
+可以尝试将他们增大到128
 ```
 
 # 使用方法
