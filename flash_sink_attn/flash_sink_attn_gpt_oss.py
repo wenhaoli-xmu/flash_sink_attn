@@ -84,7 +84,8 @@ def _fwd_kernel(
     BLOCK_M: tl.constexpr, BLOCK_N: tl.constexpr,
     BLOCK_HEADDIM: tl.constexpr,
     EVEN_M: tl.constexpr,
-    GROUP_SIZE: tl.constexpr
+    GROUP_SIZE: tl.constexpr,
+    ENABLE_SLIDING: tl.constexpr,
 ):
     start_m_block = tl.program_id(0)
     off_hb = tl.program_id(1)
@@ -112,9 +113,41 @@ def _fwd_kernel(
 
     q_idx = q_start_idx + offs_m
 
-    for kv_block_idx in tl.range(0, start_m_block + 1):
+    if ENABLE_SLIDING:
+        for kv_block_idx in tl.range(0, start_m_block + 1):
 
-        if kv_block_idx * BLOCK_N + BLOCK_N > start_m_block * BLOCK_M - sliding:
+            if kv_block_idx * BLOCK_N + BLOCK_N > start_m_block * BLOCK_M - sliding:
+
+                k_idx = kv_block_idx * BLOCK_N + tl.arange(0, BLOCK_N)
+                kv_mask = k_idx[:, None] < seqlen_k
+
+                k = tl.load(k_ptrs, mask=kv_mask)
+                v = tl.load(v_ptrs, mask=kv_mask)
+
+                qk = tl.dot(q, k.T)
+                
+                cond1 = q_idx[:,None] >= k_idx[None,:]
+                cond2 = k_idx[None, :] > (offs_m - sliding)[:, None]
+                qk = tl.where(cond1 & cond2, qk, float("-inf"))
+
+                m_ij = tl.maximum(tl.max(qk, 1) * softmax_scale, m_i)
+                p = tl.exp(qk * softmax_scale - m_ij[:, None])
+                l_ij = tl.sum(p, 1)
+
+                acc_o_scale = tl.exp(m_i - m_ij)
+                acc_o = acc_o * acc_o_scale[:, None]
+                p = p.to(v.dtype)
+                acc_o += tl.dot(p, v)
+
+                m_i = m_ij
+                l_i_new = tl.exp(lse_i - m_ij) + l_ij
+                lse_i = m_ij + tl.log(l_i_new)
+
+            k_ptrs += BLOCK_N * stride_kvn
+            v_ptrs += BLOCK_N * stride_kvn
+
+    else:
+        for kv_block_idx in tl.range(0, start_m_block + 1):
 
             k_idx = kv_block_idx * BLOCK_N + tl.arange(0, BLOCK_N)
             kv_mask = k_idx[:, None] < seqlen_k
@@ -123,10 +156,7 @@ def _fwd_kernel(
             v = tl.load(v_ptrs, mask=kv_mask)
 
             qk = tl.dot(q, k.T)
-            
-            cond1 = q_idx[:,None] >= k_idx[None,:]
-            cond2 = k_idx[None, :] > (offs_m - sliding)[:, None]
-            qk = tl.where(cond1 & cond2, qk, float("-inf"))
+            qk = tl.where(q_idx[:,None] >= k_idx[None,:], qk, float("-inf"))
 
             m_ij = tl.maximum(tl.max(qk, 1) * softmax_scale, m_i)
             p = tl.exp(qk * softmax_scale - m_ij[:, None])
@@ -141,8 +171,8 @@ def _fwd_kernel(
             l_i_new = tl.exp(lse_i - m_ij) + l_ij
             lse_i = m_ij + tl.log(l_i_new)
 
-        k_ptrs += BLOCK_N * stride_kvn
-        v_ptrs += BLOCK_N * stride_kvn
+            k_ptrs += BLOCK_N * stride_kvn
+            v_ptrs += BLOCK_N * stride_kvn
 
     o_scale = tl.exp(m_i - lse_i)
     acc_o = acc_o * o_scale[:, None]
@@ -175,6 +205,7 @@ def _bwd_kernel(
     BLOCK_HEADDIM: tl.constexpr,
     EVEN_M: tl.constexpr,
     GROUP_SIZE: tl.constexpr,
+    ENABLE_SLIDING: tl.constexpr,
 ):
     start_m_block = tl.program_id(0)
     off_hb = tl.program_id(1)
@@ -224,8 +255,40 @@ def _bwd_kernel(
     dq_block = tl.zeros([BLOCK_M, BLOCK_HEADDIM], dtype=tl.float32)
     q_idx = q_start_idx + offs_m
 
-    for kv_block_idx in range(0, start_m_block + 1):
-        if kv_block_idx * BLOCK_N + BLOCK_N > start_m_block * BLOCK_M - sliding:
+    if ENABLE_SLIDING:
+        for kv_block_idx in range(0, start_m_block + 1):
+            if kv_block_idx * BLOCK_N + BLOCK_N > start_m_block * BLOCK_M - sliding:
+                k_idx = kv_block_idx * BLOCK_N + tl.arange(0, BLOCK_N)
+                kv_mask = k_idx[:, None] < seqlen_k
+                
+                k = tl.load(k_ptrs, mask=kv_mask)
+                v = tl.load(v_ptrs, mask=kv_mask)
+
+                qk = tl.dot(q, k.T)
+
+                cond1 = q_idx[:,None] >= k_idx[None,:]
+                cond2 = k_idx[None, :] > (offs_m - sliding)[:, None]
+                qk = tl.where(cond1 & cond2, qk, float("-inf"))
+
+                p = tl.exp(qk * softmax_scale - lse_i[:, None])
+
+                dv_block = tl.dot(p.to(do.dtype).T, do)
+                tl.atomic_add(dv_ptrs, dv_block, mask=kv_mask, sem='relaxed')
+
+                dp = tl.dot(do, v.T)
+                ds = (p * (dp - Di[:, None]) * softmax_scale).to(q.dtype)
+
+                dk_block = tl.dot(ds.T, q)
+                tl.atomic_add(dk_ptrs, dk_block, mask=kv_mask, sem='relaxed')
+
+                dq_block += tl.dot(ds, k)
+
+            k_ptrs += BLOCK_N * stride_kvn
+            v_ptrs += BLOCK_N * stride_kvn
+            dk_ptrs += BLOCK_N * stride_dkvn
+            dv_ptrs += BLOCK_N * stride_dkvn
+    else:
+        for kv_block_idx in range(0, start_m_block + 1):
             k_idx = kv_block_idx * BLOCK_N + tl.arange(0, BLOCK_N)
             kv_mask = k_idx[:, None] < seqlen_k
             
@@ -233,10 +296,7 @@ def _bwd_kernel(
             v = tl.load(v_ptrs, mask=kv_mask)
 
             qk = tl.dot(q, k.T)
-
-            cond1 = q_idx[:,None] >= k_idx[None,:]
-            cond2 = k_idx[None, :] > (offs_m - sliding)[:, None]
-            qk = tl.where(cond1 & cond2, qk, float("-inf"))
+            qk = tl.where(q_idx[:,None] >= k_idx[None,:], qk, float("-inf"))
 
             p = tl.exp(qk * softmax_scale - lse_i[:, None])
 
@@ -251,10 +311,10 @@ def _bwd_kernel(
 
             dq_block += tl.dot(ds, k)
 
-        k_ptrs += BLOCK_N * stride_kvn
-        v_ptrs += BLOCK_N * stride_kvn
-        dk_ptrs += BLOCK_N * stride_dkvn
-        dv_ptrs += BLOCK_N * stride_dkvn
+            k_ptrs += BLOCK_N * stride_kvn
+            v_ptrs += BLOCK_N * stride_kvn
+            dk_ptrs += BLOCK_N * stride_dkvn
+            dv_ptrs += BLOCK_N * stride_dkvn
 
     if EVEN_M:
         tl.store(dq_ptrs, dq_block)
@@ -305,6 +365,7 @@ def _flash_attn_forward(
         BLOCK_HEADDIM=BLOCK_HEADDIM,
         EVEN_M=(seqlen_q % BLOCK_M == 0),
         GROUP_SIZE=GROUP_SIZE,
+        ENABLE_SLIDING=(sliding is not None),
         num_warps=num_warps,
         num_stages=1)
 
@@ -369,6 +430,7 @@ def _flash_attn_backward(
         BLOCK_HEADDIM=BLOCK_HEADDIM,
         EVEN_M=(seqlen_q % BLOCK_M == 0),
         GROUP_SIZE=GROUP_SIZE,
+        ENABLE_SLIDING=(sliding is not None),
         num_warps=num_warps,
         num_stages=1)
 

@@ -41,7 +41,7 @@ def eager_attention_forward(
     rng = torch.arange(num_tokens)
 
     cond1 = rng[:, None] >= rng[None, :]
-    cond2 = rng[None, :] > rng[:, None] - sliding
+    cond2 = rng[None, :] > rng[:, None] - sliding if sliding is not None else True
     causal_mask = torch.where(cond1 & cond2, 0, float('-inf')).to(dtype).cuda()
 
     query_states = query.transpose(1,2)
