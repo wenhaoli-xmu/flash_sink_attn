@@ -43,7 +43,7 @@ dtype = torch.float16
 # 使用方法
 ```python
 from flash_sink_attn import flash_sink_attn_func
-from flash_sink_attn import SinkCacheManager
+from flash_sink_attn import SlidingCacheManager
 
 from types import MethodType
 from transformers.models.gpt_oss.modeling_gpt_oss import apply_rotary_pos_emb
