@@ -226,7 +226,7 @@ def _bwd_kernel(
     dv_ptrs = DV + off_b * stride_dkvb + off_kv_h * stride_dkvh + (offs_n[:, None] * stride_dkvn + offs_d[None, :])
     
     dsink_ptr = DSink + off_h
-    
+
     lse_ptrs = LSE + off_hb * seqlen_q_rounded + offs_m
     d_ptrs = D + off_hb * seqlen_q_rounded + offs_m
 

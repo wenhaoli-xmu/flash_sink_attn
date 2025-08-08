@@ -1,3 +1,7 @@
+GPT-OSS 专用 flash attention with sink and sliding window.
+
+精度验证OK，速度和内存开销也比eager更优
+
 # 安装
 ```
 git clone https://github.com/wenhaoli-xmu/flash_sink_attn.git
