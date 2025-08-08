@@ -219,7 +219,7 @@ def _bwd_kernel(
     if not EVEN_M:
         d_sink_per_query = tl.where(mask_m, d_sink_per_query, 0.0)
     d_sink_total = tl.sum(d_sink_per_query, axis=0)
-    tl.atomic_add(dsink_ptr, d_sink_total)
+    tl.atomic_add(dsink_ptr, d_sink_total, sem='relaxed')
         
     dq_block = tl.zeros([BLOCK_M, BLOCK_HEADDIM], dtype=tl.float32)
     q_idx = q_start_idx + offs_m
@@ -241,13 +241,13 @@ def _bwd_kernel(
             p = tl.exp(qk * softmax_scale - lse_i[:, None])
 
             dv_block = tl.dot(p.to(do.dtype).T, do)
-            tl.atomic_add(dv_ptrs, dv_block, mask=kv_mask)
+            tl.atomic_add(dv_ptrs, dv_block, mask=kv_mask, sem='relaxed')
 
             dp = tl.dot(do, v.T)
             ds = (p * (dp - Di[:, None]) * softmax_scale).to(q.dtype)
 
             dk_block = tl.dot(ds.T, q)
-            tl.atomic_add(dk_ptrs, dk_block, mask=kv_mask)
+            tl.atomic_add(dk_ptrs, dk_block, mask=kv_mask, sem='relaxed')
 
             dq_block += tl.dot(ds, k)
 
