@@ -42,7 +42,7 @@ class SinkCacheManager:
             end_pos = self.num_kv + update_token
             assert end_pos <= self.max_tokens, f"Context length exceed its maximum supported value."
             self.key[:, beg_pos: end_pos] = key
-            self.val[:, beg_pos, end_pos] = val
+            self.val[:, beg_pos: end_pos] = val
             self.num_kv = end_pos
         
         else:
