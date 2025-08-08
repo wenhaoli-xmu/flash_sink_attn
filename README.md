@@ -72,17 +72,14 @@ def _forward_gpt_oss(
     # ================================================
     # NOTE: 最关键的代码
     # 算子仅支持训练，不支持推理，推理请转换为eager attention
-    manager = SinkCacheManager(
-        hidden_states.shape[0], 
-        key_states.shape[2], 
-        key_states.shape[3], 
-        self.sinks, 
+    manager = SlidingCacheManager(
         self.sliding_window)
     manager.update(key_states, value_states)
     attn_output = flash_sink_attn_func(
         query_states,
         key_states,
         value_states,
+        self.sinks,
         manager)
     # ================================================
 
