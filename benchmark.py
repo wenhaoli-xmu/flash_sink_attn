@@ -15,7 +15,7 @@ dtype = torch.float16
 query = torch.randn((1, num_tokens, num_query_heads, 128), device='cuda', dtype=dtype) * 0.01
 key = torch.randn((1, num_tokens, num_kv_heads, 128), device='cuda', dtype=dtype) * 0.01
 value = torch.randn((1, num_tokens, num_kv_heads, 128), device='cuda', dtype=dtype) * 0.01
-sink = torch.randn((num_query_heads,), dtype=dtype, device='cuda') * 10
+sink = torch.randn((num_query_heads,), dtype=dtype, device='cuda') * 0.01
 
 
 query.requires_grad_(True)
@@ -43,11 +43,6 @@ def eager_attention_forward(
     cond1 = rng[:, None] >= rng[None, :]
     cond2 = rng[None, :] > rng[:, None] - sliding
     causal_mask = torch.where(cond1 & cond2, 0, float('-inf')).to(dtype).cuda()
-
-    import matplotlib.pyplot as plt
-    plt.figure()
-    plt.imshow(causal_mask.cpu().float().numpy())
-    plt.savefig("causal_mask.jpg", dpi=640)
 
     query_states = query.transpose(1,2)
     key_states = key.transpose(1,2).repeat_interleave(num_key_value_groups, dim=1)

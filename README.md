@@ -29,11 +29,10 @@ BLOCK_N = 64
 python benchmark.py
 
 脚本中的如下参数可以修改：
-num_tokens = 32123
+num_tokens = 4224
 num_kv_heads = 4
 num_query_heads = 28
-sink = 64
-sliding = 2048
+sliding = 256
 dtype = torch.float16
 ```
 
