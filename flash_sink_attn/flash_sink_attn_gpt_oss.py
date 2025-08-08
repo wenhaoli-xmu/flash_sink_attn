@@ -213,8 +213,7 @@ def _bwd_kernel(
         
     sink_logit = tl.load(sink + off_h)
     p_sink = tl.exp(sink_logit - lse_i)
-    
-    # MODIFICATION: Removed incorrect `* softmax_scale`. The sink logit is not scaled in the forward pass.
+
     d_sink_per_query = -p_sink * Di
     
     if not EVEN_M:
@@ -236,7 +235,7 @@ def _bwd_kernel(
             qk = tl.dot(q, k.T)
 
             cond1 = q_idx[:,None] >= k_idx[None,:]
-            cond2 = ~(k_idx[None, :] <= (offs_m - sliding)[:, None])
+            cond2 = k_idx[None, :] > (offs_m - sliding)[:, None]
             qk = tl.where(cond1 & cond2, qk, float("-inf"))
 
             p = tl.exp(qk * softmax_scale - lse_i[:, None])

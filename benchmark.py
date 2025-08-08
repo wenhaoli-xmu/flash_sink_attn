@@ -15,7 +15,7 @@ dtype = torch.float16
 query = torch.randn((1, num_tokens, num_query_heads, 128), device='cuda', dtype=dtype) * 0.01
 key = torch.randn((1, num_tokens, num_kv_heads, 128), device='cuda', dtype=dtype) * 0.01
 value = torch.randn((1, num_tokens, num_kv_heads, 128), device='cuda', dtype=dtype) * 0.01
-sink = torch.randn((num_query_heads,), dtype=dtype, device='cuda') * 0.01
+sink = torch.randn((num_query_heads,), dtype=dtype, device='cuda')
 
 
 query.requires_grad_(True)
@@ -56,9 +56,10 @@ def eager_attention_forward(
     combined_logits = torch.cat([attn_weights, sinks], dim=-1)
     combined_logits = combined_logits - combined_logits.max(dim=-1, keepdim=True).values
     probs = F.softmax(combined_logits, dim=-1, dtype=combined_logits.dtype)
-    scores = probs[..., :-1]  # we drop the sink here
+    scores = probs[..., :-1]
     attn_output = torch.matmul(scores, value_states)
     attn_output = attn_output.transpose(1, 2).contiguous()
+
     return attn_output
 
 
