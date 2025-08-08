@@ -140,8 +140,6 @@ def _fwd_kernel(
             l_i_new = tl.exp(lse_i - m_ij) + l_ij
             lse_i = m_ij + tl.log(l_i_new)
 
-        # k_ptrs.advance((BLOCK_N, 0))
-        # v_ptrs.advance((BLOCK_N, 0))
         k_ptrs += BLOCK_N * stride_kvn
         v_ptrs += BLOCK_N * stride_kvn
 
