@@ -22,6 +22,10 @@ Dynamic: requires-dist
 Dynamic: requires-python
 Dynamic: summary
 
+GPT-OSS 专用 flash attention with sink and sliding window.
+
+精度验证OK，速度和内存开销也比eager更优
+
 # 安装
 ```
 git clone https://github.com/wenhaoli-xmu/flash_sink_attn.git
@@ -34,13 +38,13 @@ Tips: 最好安装最新的triton 3.4.0版本（如果能安装的上）
 ```
 # [可选]安装profiler（运行benchmark.py需要）
 git clone https://github.com/wenhaoli-xmu/lm-profiler.git
-cd profiler
+cd lm-profiler
 pip install -e .
 ```
 
 # 调参数
 ```
-对于H20/H100，可以打开 flash_sink_attn/flash_sink_attn.py，里面有两个global变量：
+对于H20/H100，可以打开 flash_sink_attn/flash_sink_attn_gpt_oss.py，里面有两个global变量：
 
 BLOCK_M = 64
 BLOCK_N = 64
@@ -53,18 +57,17 @@ BLOCK_N = 64
 python benchmark.py
 
 脚本中的如下参数可以修改：
-num_tokens = 32123
+num_tokens = 4224
 num_kv_heads = 4
 num_query_heads = 28
-sink = 64
-sliding = 2048
+sliding = 256
 dtype = torch.float16
 ```
 
 # 使用方法
 ```python
-from .flash_sink_attn import flash_sink_attn_func
-from .sink_cache import SinkCacheManager
+from flash_sink_attn import flash_sink_attn_func
+from flash_sink_attn import SlidingCacheManager
 
 from types import MethodType
 from transformers.models.gpt_oss.modeling_gpt_oss import apply_rotary_pos_emb
@@ -96,17 +99,14 @@ def _forward_gpt_oss(
     # ================================================
     # NOTE: 最关键的代码
     # 算子仅支持训练，不支持推理，推理请转换为eager attention
-    manager = SinkCacheManager(
-        hidden_states.shape[0], 
-        key_states.shape[2], 
-        key_states.shape[3], 
-        self.sinks, 
+    manager = SlidingCacheManager(
         self.sliding_window)
     manager.update(key_states, value_states)
     attn_output = flash_sink_attn_func(
         query_states,
         key_states,
         value_states,
+        self.sinks,
         manager)
     # ================================================
 

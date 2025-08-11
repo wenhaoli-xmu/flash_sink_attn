@@ -1,3 +1,4 @@
 from .flash_sink_attn_gpt_oss import flash_sink_attn_func
+from .flash_sink_varlen_attn_gpt_oss import flash_sink_attn_varlen_func
 from .flash_attn_with_sink import flash_attn_with_sink_func
 from .sliding_cache import SlidingCacheManager

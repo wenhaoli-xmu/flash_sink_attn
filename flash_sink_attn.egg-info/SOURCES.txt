@@ -3,7 +3,9 @@ setup.py
 flash_sink_attn/__init__.py
 flash_sink_attn/flash_attn_with_sink.py
 flash_sink_attn/flash_sink_attn.py
-flash_sink_attn/sink_cache.py
+flash_sink_attn/flash_sink_attn_gpt_oss.py
+flash_sink_attn/flash_sink_varlen_attn_gpt_oss.py
+flash_sink_attn/sliding_cache.py
 flash_sink_attn.egg-info/PKG-INFO
 flash_sink_attn.egg-info/SOURCES.txt
 flash_sink_attn.egg-info/dependency_links.txt

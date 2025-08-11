@@ -41,6 +41,25 @@ dtype = torch.float16
 ```
 
 # 使用方法
+
+**flash_attn_varlen_func的使用方法**
+```python
+from flash_sink_attn import flash_sink_attn_varlen_func
+from flash_sink_attn import SlidingCacheManager
+
+manager = SlidingCacheManager(self.sliding_window)
+manager.update(key_states, value_states)
+attn_output = flash_sink_attn_varlen_func(
+    query_states,
+    key_states,
+    value_states,
+    self.sinks,
+    cu_seqlen,
+    manager)
+```
+
+**flash_attn_func的使用方法**
+
 ```python
 from flash_sink_attn import flash_sink_attn_func
 from flash_sink_attn import SlidingCacheManager

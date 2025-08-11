@@ -12,9 +12,9 @@ num_query_heads = 28
 sliding = 256
 dtype = torch.float16
 
-query = torch.randn((1, num_tokens, num_query_heads, 128), device='cuda', dtype=dtype) * 0.01
-key = torch.randn((1, num_tokens, num_kv_heads, 128), device='cuda', dtype=dtype) * 0.01
-value = torch.randn((1, num_tokens, num_kv_heads, 128), device='cuda', dtype=dtype) * 0.01
+query = torch.randn((1, num_tokens, num_query_heads, 128), device='cuda', dtype=dtype)
+key = torch.randn((1, num_tokens, num_kv_heads, 128), device='cuda', dtype=dtype)
+value = torch.randn((1, num_tokens, num_kv_heads, 128), device='cuda', dtype=dtype)
 sink = torch.randn((num_query_heads,), dtype=dtype, device='cuda')
 
 
