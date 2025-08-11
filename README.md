@@ -54,7 +54,7 @@ attn_output = flash_sink_attn_varlen_func(
     key_states,
     value_states,
     self.sinks,
-    cu_seqlen,
+    cu_seqlen, # (batch_size + 1, )
     manager)
 ```
 
