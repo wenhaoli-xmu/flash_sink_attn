@@ -48,7 +48,7 @@ def _bwd_preprocess_do_o_dot(
     ).to(tl.float32)
 
     delta = tl.sum(o * do, axis=1)
-    tl.store(Delta + off_h * seqlen_q + offs_m, delta)
+    tl.store(Delta + off_h * seqlen_q + offs_m, delta, mask=mask_m)
 
 
 def init_to_zero(name):
@@ -220,7 +220,7 @@ def _bwd_kernel(
     dsink_ptr = DSink + off_h
     lse_ptrs = LSE + off_h * seqlen_q + offs_m
     d_ptrs = D + off_h * seqlen_q + offs_m
-    mask_m = (offs_m >= m_begin) & (offs_m < m_end)
+    mask_m = (offs_m >= m_begin) and (offs_m < m_end)
 
     q = tl.load(q_ptrs, mask=mask_m[:, None], other=0.0)
     do = tl.load(do_ptrs, mask=mask_m[:, None], other=0.0)

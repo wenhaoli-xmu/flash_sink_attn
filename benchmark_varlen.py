@@ -5,13 +5,13 @@ import numpy as np
 
 from flash_sink_attn import flash_sink_attn_varlen_func, SlidingCacheManager
 
-batch_size = 3
-# seqlens = [2271, 4212, 1152] # 有误差
-seqlens = [2048, 4096, 1152] # 基本没有误差
+batch_size = 1
+seqlens = [2271, 4212, 1152] # 有误差
+# seqlens = [2048, 4096, 1152] # 基本没有误差
 num_kv_heads = 4
 num_query_heads = 28
 head_dim = 128
-sliding = None
+sliding = 256
 dtype = torch.float16
 
 max_seqlen = max(seqlens)
@@ -112,13 +112,16 @@ print(torch.dist(ref_grad_v, our_grad_v))
 print(torch.dist(ref_grad_s, our_grad_s))
 
 import matplotlib.pyplot as plt
-e = (ref_grad_q - our_grad_q).abs().flatten(1).float().cpu().abs()
-k = 100000
-threshold = torch.topk(e.flatten(), k).values.min()
-e_highlighted = e.where(e >= threshold, torch.tensor(0.))
-plt.imshow(e_highlighted, cmap='hot')
-plt.colorbar()
-plt.savefig("err_minimal.jpg")
+e = (ref_grad_q - our_grad_q).detach().abs().flatten(1).float().cpu()
+# k = 100000
+# threshold = torch.topk(e.flatten(), k).values.min()
+# e_highlighted = e.where(e >= threshold, torch.tensor(0.))
+# plt.subplot(121)
+# plt.imshow(e_highlighted, cmap='hot')
+# plt.colorbar()
+# plt.subplot(122)
+# plt.hist(e.ravel(), bins=100)
+# plt.savefig("err_minimal.jpg", dpi=960)
 
 ref_time_bwd.result(detail=True)
 our_time_bwd.result(detail=True)
