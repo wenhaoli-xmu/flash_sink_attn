@@ -11,7 +11,7 @@ seqlens = [2271, 4212, 1152] # 有误差
 num_kv_heads = 4
 num_query_heads = 28
 head_dim = 128
-sliding = 256
+sliding = 177
 dtype = torch.float16
 
 max_seqlen = max(seqlens)
@@ -97,7 +97,7 @@ for _ in range(20):
         manager = SlidingCacheManager(sliding)
         manager.update(key, value)
         our_bwd = flash_sink_attn_varlen_func(
-            query, key, value, sink, cu_seqlens, manager)
+            query, key, value, sink, cu_seqlens, manager, True)
         our_bwd.sum().backward()
 
     our_grad_q = query.grad.clone()
@@ -113,15 +113,6 @@ print(torch.dist(ref_grad_s, our_grad_s))
 
 import matplotlib.pyplot as plt
 e = (ref_grad_q - our_grad_q).detach().abs().flatten(1).float().cpu()
-# k = 100000
-# threshold = torch.topk(e.flatten(), k).values.min()
-# e_highlighted = e.where(e >= threshold, torch.tensor(0.))
-# plt.subplot(121)
-# plt.imshow(e_highlighted, cmap='hot')
-# plt.colorbar()
-# plt.subplot(122)
-# plt.hist(e.ravel(), bins=100)
-# plt.savefig("err_minimal.jpg", dpi=960)
 
 ref_time_bwd.result(detail=True)
 our_time_bwd.result(detail=True)

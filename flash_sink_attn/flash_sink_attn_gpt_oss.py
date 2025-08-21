@@ -444,7 +444,8 @@ class FlashSinkAttention(torch.autograd.Function):
             k: torch.Tensor,
             v: torch.Tensor,
             sink: torch.Tensor,
-            manager):
+            manager,
+            disable_bf16_atomic_add: bool = False):
 
         q = q if q.stride(-1) == 1 else q.contiguous()
 
@@ -455,6 +456,7 @@ class FlashSinkAttention(torch.autograd.Function):
             q_start_idx=manager.num_kv - q.shape[1],
             softmax_scale=None)
 
+        ctx.disable_bf16_atomic_add = disable_bf16_atomic_add
         ctx.save_for_backward(q, o, lse)
         ctx.sink = sink
         ctx.manager = manager
@@ -466,9 +468,15 @@ class FlashSinkAttention(torch.autograd.Function):
         q, o, lse = ctx.saved_tensors
 
         dq = torch.zeros_like(q)
-        dk = torch.zeros_like(ctx.manager.key)
-        dv = torch.zeros_like(ctx.manager.val)
-        dsink = torch.zeros_like(ctx.sink)
+
+        if ctx.disable_bf16_atomic_add is False:
+            dk = torch.zeros_like(ctx.manager.key)
+            dv = torch.zeros_like(ctx.manager.val)
+            dsink = torch.zeros_like(ctx.sink)
+        else:
+            dk = torch.zeros_like(ctx.manager.key, dtype=torch.float32)
+            dv = torch.zeros_like(ctx.manager.val, dtype=torch.float32)
+            dsink = torch.zeros_like(ctx.sink, dtype=torch.float32)
 
         _flash_attn_backward(
             o, do, q, ctx.manager.key, ctx.manager.val, dq, dk, dv,
@@ -478,8 +486,13 @@ class FlashSinkAttention(torch.autograd.Function):
             ctx.manager.num_kv - q.shape[1],
             lse,
             ctx.softmax_scale)
+        
+        if ctx.disable_bf16_atomic_add:
+            dk = dk.type(ctx.manager.key.dtype)
+            dv = dv.type(ctx.manager.value.dtype)
+            dsink = dsink.type(ctx.sink.dtype)
 
-        return dq, dk, dv, dsink, None
+        return dq, dk, dv, dsink, None, None
 
 
 flash_sink_attn_func = FlashSinkAttention.apply
