@@ -8,7 +8,6 @@ class SlidingCacheManager:
     def __init__(
             self, 
             sliding_window: int = 256):
-        
 
         super().__init__()
         self.sliding_window = sliding_window

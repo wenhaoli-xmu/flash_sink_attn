@@ -1,4 +1,62 @@
+# Personal or Temporary Files
+speed_ours.py
+
+# Virtual Environments
+venv/
+env/
+.venv/
+.env/
+virtualenv/
+ENV/
+
+# IDE / Editor Configurations
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Python Build, Packaging & Installation
+build/
+**/__pycache__/
 *.egg-info
-build
-**/__pycache__
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+wheels/
+*.egg
+*.pyc
+*.pyo
+*.pyd
+
+# Testing & Coverage
+.pytest_cache/
+.tox/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+nosetests.xml
+
+# Environment Variables & Secrets
+*.env
+.env.*
+
+# Logs & Temporary Files
+*.log
+*.log.*
+*.tmp
+*.swp
+
+# OS & General
+.DS_Store
+
+# Windows
+Thumbs.db
+
+# Project-specific Outputs
 *.jpg

@@ -6,8 +6,7 @@ import numpy as np
 from flash_sink_attn import flash_sink_attn_varlen_func, SlidingCacheManager
 
 batch_size = 1
-seqlens = [2271, 4212, 1152] # 有误差
-# seqlens = [2048, 4096, 1152] # 基本没有误差
+seqlens = [2271, 4212, 1152]
 num_kv_heads = 4
 num_query_heads = 28
 head_dim = 128
@@ -97,7 +96,7 @@ for _ in range(20):
         manager = SlidingCacheManager(sliding)
         manager.update(key, value)
         our_bwd = flash_sink_attn_varlen_func(
-            query, key, value, sink, cu_seqlens, manager, True)
+            query, key, value, sink, cu_seqlens, manager)
         our_bwd.sum().backward()
 
     our_grad_q = query.grad.clone()

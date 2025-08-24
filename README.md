@@ -1,48 +1,37 @@
-GPT-OSS 专用 flash attention with sink and sliding window.
+Here is the English translation of the README file:
 
-精度验证OK，速度和内存开销也比eager更优
+# GPT-OSS dedicated flash attention with sink and sliding window.
 
-# 安装
+# Installation
+
+First, install Triton:
+
+```
+pip install triton==3.4.0
+```
+
+Triton 3.4.0 is required to support atomic add for bf16.
+If you cannot install version 3.4.0, it is recommended to install a version between 3.1 and 3.3, but this may result in lower performance.
+
+After completing the Triton installation, you can install this package:
+
 ```
 git clone https://github.com/wenhaoli-xmu/flash_sink_attn.git
 cd flash_sink_attn
 pip install .
 ```
 
-Tips: 最好安装最新的triton 3.4.0版本（如果能安装的上）
-
 ```
-# [可选]安装profiler（运行benchmark.py需要）
+# [Optional] Install the profiler (required to run benchmark)
 git clone https://github.com/wenhaoli-xmu/lm-profiler.git
 cd lm-profiler
 pip install -e .
 ```
 
-# 调参数
-```
-对于H20/H100，可以打开 flash_sink_attn/flash_sink_attn_gpt_oss.py，里面有两个global变量：
+# Usage
 
-BLOCK_M = 64
-BLOCK_N = 64
+**How to use `flash_sink_attn_varlen_func`**
 
-可以尝试将他们增大到128
-```
-
-# 评估速度
-```
-python benchmark.py
-
-脚本中的如下参数可以修改：
-num_tokens = 4224
-num_kv_heads = 4
-num_query_heads = 28
-sliding = 256
-dtype = torch.float16
-```
-
-# 使用方法
-
-**flash_attn_varlen_func的使用方法**
 ```python
 from flash_sink_attn import flash_sink_attn_varlen_func
 from flash_sink_attn import SlidingCacheManager
@@ -58,7 +47,48 @@ attn_output = flash_sink_attn_varlen_func(
     manager)
 ```
 
-**flash_attn_func的使用方法**
+If you have installed an older version before 3.4, you need to pass an extra parameter when calling the interface:
+
+```python
+attn_output = flash_sink_attn_varlen_func(
+    query_states,
+    key_states,
+    value_states,
+    self.sinks,
+    cu_seqlen,
+    manager,
+    False) # This extra parameter is needed to ensure bf16 atomic add is not used
+```
+
+**How to use `flash_sink_attn_func`**
+
+```python
+from flash_sink_attn import flash_sink_attn_func
+from flash_sink_attn import SlidingCacheManager
+
+manager = SlidingCacheManager(self.sliding_window)
+manager.update(key_states, value_states)
+attn_output = flash_sink_attn_func(
+    query_states,
+    key_states,
+    value_states,
+    self.sinks,
+    manager)
+```
+
+As before, if you have installed an older version before 3.4, you need to pass an extra parameter when calling the interface:
+
+```python
+attn_output = flash_sink_attn_func(
+    query_states,
+    key_states,
+    value_states,
+    self.sinks,
+    manager,
+    False) # This extra parameter is needed to ensure bf16 atomic add is not used
+```
+
+**Usage in gpt-oss**
 
 ```python
 from flash_sink_attn import flash_sink_attn_func
@@ -92,10 +122,9 @@ def _forward_gpt_oss(
         # key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
 
     # ================================================
-    # NOTE: 最关键的代码
-    # 算子仅支持训练，不支持推理，推理请转换为eager attention
-    manager = SlidingCacheManager(
-        self.sliding_window)
+    # NOTE: The most critical code
+    # This operator only supports training, not inference. Please convert to eager attention for inference.
+    manager = SlidingCacheManager(self.sliding_window)
     manager.update(key_states, value_states)
     attn_output = flash_sink_attn_func(
         query_states,
@@ -112,4 +141,30 @@ def _forward_gpt_oss(
 def replace_gpt_oss_with_flash_sink_attn(model):
     for layer in model.model.layers:
         layer.self_attn.forward = MethodType(_forward_gpt_oss, layer.self_attn)
+```
+
+# Block Size Tuning
+
+
+For H20/H100, you can open `flash_sink_attn/flash_sink_attn_gpt_oss.py` and `flash_sink_attn/flash_sink_varlen_attn_gpt_oss.py`. There are two global variables inside:
+
+```
+BLOCK_M = 64
+BLOCK_N = 64
+```
+
+You can try increasing them to 128 for a better performance.
+
+# Performance Evaluation
+
+For the `flash_sink_attn_func` interface:
+
+```
+python benchmark.py
+```
+
+For the `flash_sink_attn_varlen_func` interface:
+
+```
+python benchmark_varlen.py
 ```

@@ -1,5 +1,4 @@
 import math
-
 import torch
 import triton
 import triton.language as tl
@@ -489,7 +488,7 @@ class FlashSinkAttention(torch.autograd.Function):
         
         if ctx.disable_bf16_atomic_add:
             dk = dk.type(ctx.manager.key.dtype)
-            dv = dv.type(ctx.manager.value.dtype)
+            dv = dv.type(ctx.manager.val.dtype)
             dsink = dsink.type(ctx.sink.dtype)
 
         return dq, dk, dv, dsink, None, None
