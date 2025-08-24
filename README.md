@@ -1,5 +1,3 @@
-Here is the English translation of the README file:
-
 # GPT-OSS dedicated flash attention with sink and sliding window.
 
 # Installation
